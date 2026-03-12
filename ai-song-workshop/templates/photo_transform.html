@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}Foto Transformatie - AI Liedjes Workshop{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/photo_transform.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="photo-container">
+    <h2 class="photo-title">📸 Foto Fun</h2>
+    <p class="photo-subtitle">Hoi {{ profile.name }}! Maak een foto met je webcam en kies een stijl!</p>
+
+    <!-- Error message area -->
+    <div id="error-message" class="photo-error" style="display:none;"></div>
+
+    <!-- Step 1: Camera -->
+    <div id="step-camera" class="photo-step">
+        <div class="camera-wrapper">
+            <video id="webcam-video" autoplay playsinline></video>
+            <canvas id="webcam-canvas" style="display:none;"></canvas>
+        </div>
+        <div class="camera-controls">
+            <button id="btn-capture" class="btn btn-primary" disabled>📷 Maak Foto</button>
+        </div>
+    </div>
+
+    <!-- Step 2: Preview captured photo + style selection -->
+    <div id="step-style" class="photo-step" style="display:none;">
+        <div class="preview-wrapper">
+            <img id="captured-preview" alt="Gemaakte foto" />
+        </div>
+        <div class="preview-controls">
+            <button id="btn-retake" class="btn btn-secondary">🔄 Opnieuw</button>
+        </div>
+        <h3 class="style-heading">Kies een stijl:</h3>
+        <div class="style-grid">
+            {% for style in styles %}
+            <div class="style-card" data-style-id="{{ style.id }}">
+                <span class="style-icon">{{ style.icon }}</span>
+                <span class="style-name">{{ style.name }}</span>
+                <span class="style-desc">{{ style.description }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Step 3: Loading -->
+    <div id="step-loading" class="photo-step" style="display:none;">
+        <div class="loading-spinner"></div>
+        <p class="loading-text">Bezig met transformeren... Dit kan even duren.</p>
+    </div>
+
+    <!-- Step 4: Result -->
+    <div id="step-result" class="photo-step" style="display:none;">
+        <div class="result-comparison">
+            <div class="result-panel">
+                <h4>Origineel</h4>
+                <img id="result-original" alt="Originele foto" />
+            </div>
+            <div class="result-panel">
+                <h4 id="result-style-name">Getransformeerd</h4>
+                <img id="result-transformed" alt="Getransformeerde foto" />
+            </div>
+        </div>
+        <div class="result-controls">
+            <a id="btn-download" class="btn btn-primary" download="foto-transformatie.png">⬇️ Download</a>
+            <button id="btn-another-style" class="btn btn-secondary">🎨 Andere Stijl</button>
+            <button id="btn-new-photo" class="btn btn-secondary">📷 Nieuwe Foto</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/webcam_capture.js') }}"></script>
+<script>
+(function() {
+    const video = document.getElementById('webcam-video');
+    const canvas = document.getElementById('webcam-canvas');
+    const cam = new WebcamCapture(video, canvas);
+
+    const stepCamera = document.getElementById('step-camera');
+    const stepStyle = document.getElementById('step-style');
+    const stepLoading = document.getElementById('step-loading');
+    const stepResult = document.getElementById('step-result');
+    const errorMsg = document.getElementById('error-message');
+
+    const btnCapture = document.getElementById('btn-capture');
+    const btnRetake = document.getElementById('btn-retake');
+    const btnAnotherStyle = document.getElementById('btn-another-style');
+    const btnNewPhoto = document.getElementById('btn-new-photo');
+    const btnDownload = document.getElementById('btn-download');
+
+    let selectedStyle = null;
+
+    function showStep(step) {
+        [stepCamera, stepStyle, stepLoading, stepResult].forEach(s => s.style.display = 'none');
+        step.style.display = '';
+    }
+
+    function showError(msg) {
+        errorMsg.textContent = msg;
+        errorMsg.style.display = '';
+    }
+
+    function hideError() {
+        errorMsg.style.display = 'none';
+    }
+
+    // Start camera on load
+    cam.start().then(() => {
+        btnCapture.disabled = false;
+    }).catch(err => {
+        showError(err.message);
+    });
+
+    // Capture photo
+    btnCapture.addEventListener('click', () => {
+        hideError();
+        const data = cam.capture();
+        document.getElementById('captured-preview').src = data;
+        cam.stop();
+        showStep(stepStyle);
+    });
+
+    // Retake
+    btnRetake.addEventListener('click', () => {
+        hideError();
+        selectedStyle = null;
+        document.querySelectorAll('.style-card').forEach(c => c.classList.remove('selected'));
+        cam.start().then(() => {
+            btnCapture.disabled = false;
+            showStep(stepCamera);
+        }).catch(err => showError(err.message));
+    });
+
+    // Style selection
+    document.querySelectorAll('.style-card').forEach(card => {
+        card.addEventListener('click', () => {
+            hideError();
+            document.querySelectorAll('.style-card').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            selectedStyle = card.dataset.styleId;
+            transformPhoto();
+        });
+    });
+
+    // Transform
+    function transformPhoto() {
+        if (!cam.getImageData() || !selectedStyle) return;
+        showStep(stepLoading);
+
+        fetch('/api/photo/transform', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                image: cam.getImageData(),
+                style: selectedStyle,
+                username: '{{ profile.name }}'
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('result-original').src = 'data:image/png;base64,' + data.original_image;
+                document.getElementById('result-transformed').src = 'data:image/png;base64,' + data.transformed_image;
+                btnDownload.href = 'data:image/png;base64,' + data.transformed_image;
+                const style = document.querySelector('.style-card[data-style-id="' + selectedStyle + '"]');
+                document.getElementById('result-style-name').textContent = style ? style.querySelector('.style-name').textContent : 'Getransformeerd';
+                showStep(stepResult);
+            } else {
+                showError(data.error || 'Transformatie mislukt');
+                showStep(stepStyle);
+            }
+        })
+        .catch(() => {
+            showError('Verbindingsfout. Probeer het opnieuw.');
+            showStep(stepStyle);
+        });
+    }
+
+    // Another style (keep same photo)
+    btnAnotherStyle.addEventListener('click', () => {
+        hideError();
+        selectedStyle = null;
+        document.querySelectorAll('.style-card').forEach(c => c.classList.remove('selected'));
+        showStep(stepStyle);
+    });
+
+    // New photo
+    btnNewPhoto.addEventListener('click', () => {
+        hideError();
+        selectedStyle = null;
+        document.querySelectorAll('.style-card').forEach(c => c.classList.remove('selected'));
+        cam.start().then(() => {
+            btnCapture.disabled = false;
+            showStep(stepCamera);
+        }).catch(err => showError(err.message));
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => cam.stop());
+})();
+</script>
+{% endblock %}

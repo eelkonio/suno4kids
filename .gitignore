@@ -1,0 +1,37 @@
+# Sensitive files
+keys/
+*.pem
+dev-notes/
+
+# IDE / editor
+.vscode/
+.kiro/
+
+# macOS
+.DS_Store
+Thumbs.db
+
+# Development notes (not needed in public repo)
+ALLSONGS_FEATURE.md
+API_INTEGRATION_COMPLETE.md
+API_INTEGRATION_DETAILS.md
+BUGFIX_IMAGE_SONG_PATHS.md
+CALLBACK_SYSTEM.md
+DEPLOYMENT_GUIDE.md
+deployment-config.md
+FINAL_SETUP_GUIDE.md
+IMAGE_POPUP_FEATURE.md
+IMPLEMENTATION_SUMMARY.md
+PORT80_AUTH_SETUP.md
+PROJECT_LIMIT_FEATURE.md
+QUICK_START.md
+TASK8_COMPLETE.md
+UNDELETE_FEATURE.md
+GITHUB_PREPARATION.md
+
+# Original deploy script (has hardcoded values)
+deploy_to_ec2.sh
+
+# Original nginx configs (have hardcoded domain)
+nginx-suno4kids.conf
+nginx-suno4kids-temp.conf

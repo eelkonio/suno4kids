@@ -1,0 +1,93 @@
+#!/bin/bash
+# =============================================================
+# AI Song Workshop - EC2 Deployment Script
+# =============================================================
+# Usage:
+#   1. Copy this file:  cp deploy.sh.example deploy.sh
+#   2. Edit the variables below with your actual values
+#   3. Make executable:  chmod +x deploy.sh
+#   4. Run:  ./deploy.sh
+# =============================================================
+
+set -e  # Exit on error
+
+# ---- CONFIGURE THESE ----
+EC2_HOST="ec2-XX-XX-XX-XX.eu-central-1.compute.amazonaws.com"  # Your EC2 public DNS
+EC2_USER="ec2-user"                                              # SSH user (ec2-user for Amazon Linux)
+PEM_FILE="keys/your-key.pem"                                     # Path to your SSH private key
+DOMAIN="yourdomain.example.com"                                  # Your domain name (for HTTPS)
+# --------------------------
+
+APP_DIR="ai-song-workshop"
+REMOTE_DIR="~/ai-song-workshop"
+
+echo "========================================="
+echo "AI Song Workshop - EC2 Deployment"
+echo "========================================="
+
+# Check PEM file
+if [ ! -f "$PEM_FILE" ]; then
+    echo "Error: PEM file not found at $PEM_FILE"
+    echo "Place your EC2 key pair .pem file there, or update PEM_FILE variable."
+    exit 1
+fi
+
+chmod 400 "$PEM_FILE"
+
+# Test SSH
+echo "Testing SSH connection..."
+ssh -i "$PEM_FILE" -o ConnectTimeout=10 "$EC2_USER@$EC2_HOST" "echo '✓ SSH connection successful'"
+
+# Sync files
+echo "Syncing application files..."
+rsync -avz --progress \
+    --exclude 'venv/' \
+    --exclude '__pycache__/' \
+    --exclude '*.pyc' \
+    --exclude '.git/' \
+    --exclude '.env' \
+    --exclude 'logs/*.log' \
+    --exclude 'data/' \
+    --exclude 'static/audio/*' \
+    --exclude 'static/images/*' \
+    --exclude 'static/photos/*' \
+    -e "ssh -i $PEM_FILE" \
+    "$APP_DIR/" "$EC2_USER@$EC2_HOST:$REMOTE_DIR/"
+
+echo "✓ Files synced"
+
+# Install dependencies on remote
+echo "Installing dependencies..."
+ssh -i "$PEM_FILE" "$EC2_USER@$EC2_HOST" << 'ENDSSH'
+cd ~/ai-song-workshop
+
+# Create venv if it doesn't exist
+if [ ! -d "venv" ]; then
+    python3 -m venv venv
+fi
+
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+
+# Create necessary directories
+mkdir -p logs data/callbacks static/audio static/images static/photos
+
+echo "✓ Dependencies installed"
+ENDSSH
+
+# Restart service
+echo "Restarting service..."
+ssh -i "$PEM_FILE" "$EC2_USER@$EC2_HOST" "sudo systemctl restart workshop"
+
+echo ""
+echo "========================================="
+echo "Deployment Complete!"
+echo "========================================="
+echo ""
+echo "Application: https://$DOMAIN"
+echo ""
+echo "If this is a FIRST deployment, see SETUP_GUIDE.md for:"
+echo "  - Setting up the .env file on the server"
+echo "  - Installing nginx and obtaining SSL certificate"
+echo "  - Configuring the systemd service"

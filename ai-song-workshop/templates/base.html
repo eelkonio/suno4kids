@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI Liedjes Workshop{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Hamburger menu */
+        .hamburger-btn{background:none;border:none;cursor:pointer;padding:8px;display:flex;flex-direction:column;gap:5px;z-index:1001}
+        .hamburger-btn span{display:block;width:26px;height:3px;background:#667eea;border-radius:2px;transition:transform .2s,opacity .2s}
+        .hamburger-btn.open span:nth-child(1){transform:translateY(8px) rotate(45deg)}
+        .hamburger-btn.open span:nth-child(2){opacity:0}
+        .hamburger-btn.open span:nth-child(3){transform:translateY(-8px) rotate(-45deg)}
+        .nav-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999}
+        .nav-overlay.show{display:block}
+        .nav-menu{position:fixed;top:0;right:-280px;width:260px;height:100%;background:#fff;box-shadow:-4px 0 20px rgba(0,0,0,.15);z-index:1000;transition:right .25s ease;padding:80px 0 0}
+        .nav-menu.open{right:0}
+        .nav-menu a{display:flex;align-items:center;gap:12px;padding:16px 24px;color:#333;text-decoration:none;font-size:1.1rem;font-weight:600;border-bottom:1px solid #eee;transition:background .15s}
+        .nav-menu a:hover,.nav-menu a.active{background:#f0f3ff;color:#667eea}
+        .nav-menu a .nav-icon{font-size:1.4rem}
+        .header-content{justify-content:flex-start;position:relative}
+        .hamburger-btn{position:absolute;right:0;top:50%;transform:translateY(-50%)}
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation overlay -->
+    <div class="nav-overlay" id="nav-overlay"></div>
+    <!-- Slide-out navigation menu -->
+    <nav class="nav-menu" id="nav-menu">
+        <a href="/" class="{% if request.path == '/' or request.path.startswith('/profile') or request.path.startswith('/project') %}active{% endif %}">
+            <span class="nav-icon">🎵</span> Liedjesmaker
+        </a>
+        <a href="/photo-transform" class="{% if request.path == '/photo-transform' %}active{% endif %}">
+            <span class="nav-icon">📸</span> Foto Fun
+        </a>
+        {% if request.authorization and request.authorization.username == admin_username %}
+        <a href="/allsongs">
+            <span class="nav-icon">🎶</span> Alle Liedjes
+        </a>
+        <a href="/allphotos">
+            <span class="nav-icon">🖼️</span> Alle Foto's
+        </a>
+        {% endif %}
+    </nav>
+
+    <!-- Header with logo and class name -->
+    <header class="workshop-header">
+        <div class="header-content">
+            <img src="/{{ config.api.header.logo_path }}" alt="School Logo" class="school-logo">
+            <h1 class="class-name">{{ config.api.header.class_name }}</h1>
+            <button class="hamburger-btn" id="hamburger-btn" aria-label="Menu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main content area -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="workshop-footer">
+        <p>AI Liedjes Workshop - Powered by Claude & Suno.ai</p>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+    (function(){
+        var btn=document.getElementById('hamburger-btn'),menu=document.getElementById('nav-menu'),overlay=document.getElementById('nav-overlay');
+        function toggle(){btn.classList.toggle('open');menu.classList.toggle('open');overlay.classList.toggle('show')}
+        btn.addEventListener('click',toggle);
+        overlay.addEventListener('click',toggle);
+    })();
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,2 @@
+curl -X GET "https://api.sunoapi.org/api/v1/generate/record-info?taskId=YOUR_TASK_ID" \
+  -H "Authorization: Bearer YOUR_API_KEY"

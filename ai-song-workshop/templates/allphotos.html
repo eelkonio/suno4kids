@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Alle Foto's - Admin{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2 style="color: #667eea; margin-bottom: 1.5rem;">📸 Alle Foto Transformaties</h2>
+
+    {% if not users %}
+    <p style="color: #666;">Nog geen foto's gevonden.</p>
+    {% endif %}
+
+    {% for user in users %}
+    <div style="margin-bottom: 2.5rem;">
+        <h3 style="color: #764ba2; border-bottom: 2px solid #eee; padding-bottom: 0.5rem; margin-bottom: 1rem;">
+            {{ user.name }} ({{ user.photos|length }} transformatie{{ 's' if user.photos|length != 1 }})
+        </h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;">
+            {% for photo in user.photos %}
+            <div style="background: #f8f9fa; border-radius: 12px; padding: 12px; text-align: center;">
+                <div style="font-weight: 600; margin-bottom: 8px; color: #555;">{{ photo.style }}</div>
+                <div style="display: flex; gap: 8px; justify-content: center;">
+                    {% if photo.original %}
+                    <div style="flex:1;">
+                        <div style="font-size: 0.8rem; color: #888; margin-bottom: 4px;">Origineel</div>
+                        <img src="{{ url_for('static', filename=photo.original) }}" 
+                             style="width:100%; border-radius: 8px; cursor: pointer;"
+                             onclick="window.open(this.src)" alt="Origineel">
+                    </div>
+                    {% endif %}
+                    {% if photo.transformed %}
+                    <div style="flex:1;">
+                        <div style="font-size: 0.8rem; color: #888; margin-bottom: 4px;">Getransformeerd</div>
+                        <img src="{{ url_for('static', filename=photo.transformed) }}" 
+                             style="width:100%; border-radius: 8px; cursor: pointer;"
+                             onclick="window.open(this.src)" alt="Getransformeerd">
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

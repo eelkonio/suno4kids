@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Welkom - AI Liedjes Workshop{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 600px; margin: 4rem auto;">
+    <h2 style="text-align: center; color: #667eea; margin-bottom: 2rem;">
+        Welkom bij de AI Liedjes Workshop!
+    </h2>
+    
+    <p style="text-align: center; margin-bottom: 2rem; color: #666;">
+        Vul je naam in om te beginnen met het maken van je eigen liedjes.
+    </p>
+    
+    {% if error %}
+    <div class="error-message">
+        {{ error }}
+    </div>
+    {% endif %}
+    
+    <form method="POST" action="{{ url_for('main.create_or_select_profile') }}" id="profileForm">
+        <div class="form-group">
+            <label for="name" class="form-label">Jouw naam:</label>
+            <input 
+                type="text" 
+                id="name" 
+                name="name" 
+                class="form-input" 
+                placeholder="Typ hier je naam..."
+                required
+                autofocus
+            >
+        </div>
+        
+        <button type="submit" class="btn btn-primary" style="width: 100%;">
+            Start met Liedjes Maken! 🎵
+        </button>
+    </form>
+</div>
+
+<script>
+// Client-side validation
+document.getElementById('profileForm').addEventListener('submit', function(e) {
+    const nameInput = document.getElementById('name');
+    const name = nameInput.value.trim();
+    
+    if (!name) {
+        e.preventDefault();
+        alert('Vul alsjeblieft je naam in!');
+        nameInput.focus();
+    }
+});
+</script>
+{% endblock %}

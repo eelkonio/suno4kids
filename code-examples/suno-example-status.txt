@@ -1,0 +1,17 @@
+Task Status Explanation
+​
+GENERATING
+Processing
+Task is being processed
+​
+SUCCESS
+Completed
+Task completed successfully
+​
+FAILED
+Failed
+Task failed to complete
+​
+PENDING
+Queued
+Task is queued for processing

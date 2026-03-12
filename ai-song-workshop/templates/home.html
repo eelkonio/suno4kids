@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Welkom bij de AI Liedjes Workshop!{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 style="text-align: center; color: #667eea; margin-bottom: 1.5rem;">Welkom bij de AI Liedjes Workshop!</h1>
+    
+    <p style="text-align: center; font-size: 1.1rem; color: #555; margin-bottom: 2rem; line-height: 1.6;">
+        Maak je eigen unieke liedjes met behulp van kunstmatige intelligentie! 
+        Beschrijf waar je liedje over moet gaan, kies een muziekstijl, en laat de AI de rest doen.
+        Binnen enkele minuten heb je jouw eigen gepersonaliseerde nummer!
+    </p>
+    
+    <!-- Infographic image -->
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <img src="{{ url_for('static', filename='home/je-eigen-lied.png') }}" 
+             alt="Hoe werkt de AI Liedjes Workshop" 
+             style="max-width: 100%; height: auto; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+    </div>
+    
+    <!-- Video explanation -->
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <video controls 
+               style="max-width: 100%; height: auto; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            <source src="{{ url_for('static', filename='home/je-eigen-lied.mp4') }}" type="video/mp4">
+            Je browser ondersteunt geen video.
+        </video>
+    </div>
+    
+    <!-- Start button -->
+    <div style="text-align: center;">
+        <a href="{{ url_for('main.profile_page') }}" class="btn btn-primary" style="display: inline-block; text-decoration: none; font-size: 1.2rem; padding: 1rem 3rem;">
+            Start met je eigen liedje!
+        </a>
+    </div>
+</div>
+{% endblock %}

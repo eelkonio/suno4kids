@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}Mijn Projecten - AI Liedjes Workshop{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+        <h2 style="color: #667eea;">Hallo, {{ profile.name }}! 👋</h2>
+        {% if projects|length >= 5 %}
+        <button class="btn btn-primary" disabled style="opacity: 0.5; cursor: not-allowed;" title="Maximum van 5 projecten bereikt">
+            + Nieuw Project (Max bereikt)
+        </button>
+        {% else %}
+        <a href="{{ url_for('main.create_project', profile_id=profile.id) }}" class="btn btn-primary">
+            + Nieuw Project
+        </a>
+        {% endif %}
+    </div>
+    
+    {% if error %}
+    <div class="error-message">
+        ⚠️ {{ error }}
+    </div>
+    {% endif %}
+    
+    {% if projects|length >= 5 %}
+    <div class="info-message">
+        ℹ️ Je hebt het maximum van 5 projecten bereikt. Je kunt geen nieuwe projecten meer aanmaken.
+    </div>
+    {% endif %}
+    
+    {% if projects %}
+    <div class="projects-grid">
+        {% for project in projects %}
+        <div class="project-card" onclick="window.location.href='{{ url_for('main.edit_project', project_id=project.id) }}'">
+            <div class="project-header">
+                <h3>{{ project.description or 'Nieuw Project' }}</h3>
+                <span class="project-date">{{ project.created_at.strftime('%d-%m-%Y') }}</span>
+            </div>
+            
+            <div class="project-status">
+                {% if project.lyrics_generated %}
+                <span class="status-badge status-success">✓ Tekst</span>
+                {% endif %}
+                
+                {% if project.song_generated %}
+                <span class="status-badge status-success">✓ Liedje</span>
+                {% endif %}
+                
+                {% if project.image_generated %}
+                <span class="status-badge status-success">✓ Afbeelding</span>
+                {% endif %}
+                
+                {% if not project.lyrics_generated %}
+                <span class="status-badge status-pending">⏳ Nog niet gestart</span>
+                {% endif %}
+            </div>
+            
+            {% if project.genre %}
+            <div class="project-genre">
+                Genre: {{ project.genre }}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 3rem; color: #666;">
+        <p style="font-size: 1.2rem; margin-bottom: 1rem;">
+            Je hebt nog geen projecten.
+        </p>
+        <p>Klik op "Nieuw Project" om te beginnen!</p>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.error-message {
+    background: #fed7d7;
+    color: #742a2a;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid #fc8181;
+    font-weight: 500;
+}
+
+.info-message {
+    background: #bee3f8;
+    color: #2c5282;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid #4299e1;
+    font-weight: 500;
+}
+
+.projects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.project-card {
+    background: #f7fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.project-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    border-color: #667eea;
+}
+
+.project-header {
+    margin-bottom: 1rem;
+}
+
+.project-header h3 {
+    color: #2d3748;
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+}
+
+.project-date {
+    color: #718096;
+    font-size: 0.9rem;
+}
+
+.project-status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: bold;
+}
+
+.status-success {
+    background: #c6f6d5;
+    color: #22543d;
+}
+
+.status-pending {
+    background: #feebc8;
+    color: #7c2d12;
+}
+
+.project-genre {
+    color: #667eea;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+</style>
+{% endblock %}

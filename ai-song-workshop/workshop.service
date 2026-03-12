@@ -1,0 +1,17 @@
+[Unit]
+Description=AI Song Workshop Flask Application
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/ai-song-workshop
+Environment="PATH=/home/ec2-user/ai-song-workshop/venv/bin"
+ExecStart=/home/ec2-user/ai-song-workshop/venv/bin/python app.py
+Restart=always
+RestartSec=10
+# Allow binding to privileged ports (< 1024) like port 80
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target

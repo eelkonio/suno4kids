@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}Project Bewerken - AI Liedjes Workshop{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1rem;">
+    <a href="{{ url_for('main.list_projects', profile_id=project.profile_id) }}" style="color: white; text-decoration: none;">
+        ← Terug naar Projecten
+    </a>
+</div>
+
+<div class="card">
+    <h2 style="color: #667eea; margin-bottom: 2rem;">Jouw Liedje Maken 🎵</h2>
+    
+    <!-- Step 1: Song Description -->
+    <div class="project-section">
+        <h3>Stap 1: Waar gaat je liedje over?</h3>
+        <form id="descriptionForm">
+            <div class="form-group">
+                <label for="description" class="form-label">Beschrijving:</label>
+                <textarea 
+                    id="description" 
+                    name="description" 
+                    class="form-textarea"
+                    placeholder="Bijvoorbeeld: Een liedje over mijn hond die graag speelt in het park..."
+                >{{ project.description }}</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="genre" class="form-label">Muziekstijl:</label>
+                <select id="genre" name="genre" class="form-select">
+                    <option value="">Kies een stijl...</option>
+                    <option value="pop" {% if project.genre == 'pop' %}selected{% endif %}>Pop</option>
+                    <option value="rock" {% if project.genre == 'rock' %}selected{% endif %}>Rock</option>
+                    <option value="electronic" {% if project.genre == 'electronic' %}selected{% endif %}>Elektronisch</option>
+                    <option value="hip-hop" {% if project.genre == 'hip-hop' %}selected{% endif %}>Hip-Hop</option>
+                    <option value="folk" {% if project.genre == 'folk' %}selected{% endif %}>Folk</option>
+                    <option value="jazz" {% if project.genre == 'jazz' %}selected{% endif %}>Jazz</option>
+                    <option value="classical" {% if project.genre == 'classical' %}selected{% endif %}>Klassiek</option>
+                </select>
+            </div>
+            
+            <button 
+                type="button" 
+                id="generateLyricsBtn" 
+                class="btn btn-primary"
+                onclick="generateLyrics()"
+            >
+                Genereer Tekst 📝
+            </button>
+        </form>
+    </div>
+
+    
+    <!-- Step 2: Lyrics Editing -->
+    <div class="project-section" id="lyricsSection" {% if not project.lyrics %}style="display: none;"{% endif %}>
+        <h3>Stap 2: Pas je tekst aan (optioneel)</h3>
+        <div class="form-group">
+            <label for="lyrics" class="form-label">Songtekst:</label>
+            <textarea 
+                id="lyrics" 
+                name="lyrics" 
+                class="form-textarea"
+                style="min-height: 300px;"
+            >{{ project.lyrics or '' }}</textarea>
+        </div>
+        
+        <button 
+            type="button" 
+            class="btn btn-secondary"
+            onclick="saveLyrics()"
+        >
+            Bewaar Tekst 💾
+        </button>
+    </div>
+    
+    <!-- Step 3: Generate Song and Image -->
+    <div class="project-section" id="generateSection" {% if not project.lyrics %}style="display: none;"{% endif %}>
+        <h3>Stap 3: Maak je liedje!</h3>
+        
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <button 
+                type="button" 
+                id="generateSongBtn"
+                class="btn btn-primary"
+                onclick="generateSong()"
+                {% if project.song_generated %}disabled{% endif %}
+            >
+                {% if project.song_generated %}
+                ✓ Liedje Gemaakt
+                {% else %}
+                Genereer Liedje 🎵
+                {% endif %}
+            </button>
+            
+            {% if config.api.google_api_key %}
+            <button 
+                type="button" 
+                id="generateImageBtn"
+                class="btn btn-secondary"
+                onclick="generateImage()"
+                {% if project.image_generated %}disabled{% endif %}
+            >
+                {% if project.image_generated %}
+                ✓ Afbeelding Gemaakt
+                {% else %}
+                Genereer Afbeelding 🎨
+                {% endif %}
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Song Player -->
+    {% if project.song_file_path %}
+    <div class="project-section">
+        <h3>Jouw Liedje 🎧</h3>
+        <audio controls style="width: 100%;">
+            <source src="{{ url_for('static', filename=project.song_file_path) }}" type="audio/mpeg">
+            Je browser ondersteunt geen audio afspelen.
+        </audio>
+    </div>
+    {% endif %}
+    
+    <!-- Image Display -->
+    {% if project.image_file_path %}
+    <div class="project-section">
+        <h3>Jouw Afbeelding 🖼️</h3>
+        <img src="{{ url_for('static', filename=project.image_file_path) }}" alt="Song Artwork" style="max-width: 100%; border-radius: 12px;">
+    </div>
+    {% endif %}
+</div>
+
+<!-- Loading overlay -->
+<div id="loadingOverlay" style="display: none;">
+    <div class="loading-container">
+        <div class="loading-spinner"></div>
+        <p id="loadingMessage" style="margin-top: 1rem; color: white; font-size: 1.2rem;"></p>
+    </div>
+</div>
+
+<style>
+.project-section {
+    margin-bottom: 3rem;
+    padding-bottom: 2rem;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.project-section:last-child {
+    border-bottom: none;
+}
+
+.project-section h3 {
+    color: #2d3748;
+    margin-bottom: 1.5rem;
+}
+
+#loadingOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+</style>
+
+<script>
+const projectId = '{{ project.id }}';
+
+// Auto-save description and genre
+document.getElementById('description').addEventListener('blur', saveDescription);
+document.getElementById('genre').addEventListener('change', saveDescription);
+
+function saveDescription() {
+    const description = document.getElementById('description').value;
+    const genre = document.getElementById('genre').value;
+    
+    fetch(`/api/project/${projectId}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({description, genre})
+    });
+}
+
+async function generateLyrics() {
+    const description = document.getElementById('description').value.trim();
+    const genre = document.getElementById('genre').value;
+    
+    if (!description || !genre) {
+        alert('Vul eerst een beschrijving en muziekstijl in!');
+        return;
+    }
+    
+    showLoading('Tekst wordt gegenereerd... ⏳');
+    
+    try {
+        const response = await fetch(`/api/project/${projectId}/generate-lyrics`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({description, genre})
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('lyrics').value = data.lyrics;
+            document.getElementById('lyricsSection').style.display = 'block';
+            document.getElementById('generateSection').style.display = 'block';
+        } else {
+            alert(data.error || 'Er ging iets mis. Probeer het opnieuw.');
+        }
+    } catch (error) {
+        alert('Er ging iets mis. Probeer het opnieuw.');
+    } finally {
+        hideLoading();
+    }
+}
+
+async function saveLyrics() {
+    const lyrics = document.getElementById('lyrics').value;
+    
+    await fetch(`/api/project/${projectId}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({lyrics})
+    });
+    
+    alert('Tekst opgeslagen! ✓');
+}
+
+async function generateSong() {
+    showLoading('Liedje wordt gemaakt... Dit kan 30-60 seconden duren 🎵');
+    
+    try {
+        const response = await fetch(`/api/project/${projectId}/generate-song`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error || 'Er ging iets mis. Probeer het opnieuw.');
+        }
+    } catch (error) {
+        alert('Er ging iets mis. Probeer het opnieuw.');
+    } finally {
+        hideLoading();
+    }
+}
+
+async function generateImage() {
+    showLoading('Afbeelding wordt gemaakt... ⏳');
+    
+    try {
+        const response = await fetch(`/api/project/${projectId}/generate-image`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error || 'Er ging iets mis. Probeer het opnieuw.');
+        }
+    } catch (error) {
+        alert('Er ging iets mis. Probeer het opnieuw.');
+    } finally {
+        hideLoading();
+    }
+}
+
+function showLoading(message) {
+    document.getElementById('loadingMessage').textContent = message;
+    document.getElementById('loadingOverlay').style.display = 'flex';
+}
+
+function hideLoading() {
+    document.getElementById('loadingOverlay').style.display = 'none';
+}
+</script>
+{% endblock %}
