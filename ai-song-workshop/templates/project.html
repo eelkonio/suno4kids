@@ -119,6 +119,12 @@
             <source src="{{ url_for('static', filename=project.song_file_path) }}" type="audio/mpeg">
             Je browser ondersteunt geen audio afspelen.
         </audio>
+        <a href="{{ url_for('static', filename=project.song_file_path) }}"
+           download
+           title="Download je liedje"
+           style="display: inline-block; margin-top: 0.75rem; font-size: 1.5rem; text-decoration: none;">
+            💾 Download je liedje
+        </a>
     </div>
     {% endif %}
     
