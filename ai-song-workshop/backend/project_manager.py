@@ -24,12 +24,14 @@ class ProjectManager:
         """
         self.session_manager = session_manager
     
-    def create_project(self, profile_id: str) -> SongProject:
+    def create_project(self, profile_id: str, max_projects: int = 10) -> SongProject:
         """
         Create new empty song project.
         
         Args:
             profile_id: ID of the profile to create project for
+            max_projects: Maximum number of projects allowed per profile.
+                         Caller should pass school_config.max_projects_per_profile.
             
         Returns:
             New SongProject with empty fields
@@ -42,9 +44,9 @@ class ProjectManager:
         if not profile:
             raise ValueError(f"Profiel niet gevonden: {profile_id}")
         
-        # Check project limit (max 5 projects per profile)
-        if len(profile.project_ids) >= 5:
-            raise ValueError("Je hebt het maximum van 5 projecten bereikt. Verwijder eerst een oud project.")
+        # Check project limit
+        if len(profile.project_ids) >= max_projects:
+            raise ValueError(f"Je hebt het maximum van {max_projects} projecten bereikt. Verwijder eerst een oud project.")
         
         # Create new project
         project = SongProject.create(profile_id)

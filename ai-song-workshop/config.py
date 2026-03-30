@@ -44,6 +44,7 @@ class AppConfig:
     host: str
     port: int
     callback_url: Optional[str] = None
+    max_projects_per_profile: int = 10
 
 
 def load_config() -> AppConfig:
@@ -86,6 +87,9 @@ def load_config() -> AppConfig:
     # Callback URL for Suno API
     callback_url = os.getenv('CALLBACK_URL')
     
+    # Project limit per profile
+    max_projects = int(os.getenv('MAX_PROJECTS_PER_PROFILE', '10'))
+    
     # Build configuration objects
     header_config = HeaderConfig(
         logo_path=logo_path,
@@ -111,7 +115,8 @@ def load_config() -> AppConfig:
         flask_debug=flask_debug,
         host=host,
         port=port,
-        callback_url=callback_url
+        callback_url=callback_url,
+        max_projects_per_profile=max_projects
     )
 
 
