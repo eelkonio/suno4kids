@@ -1,22 +1,26 @@
 """
 Main application entry point for AI Song Workshop Website.
+Multi-tenant: each HTTPS Basic Auth username is a school/tenant.
 """
 import os
-from flask import Flask, request, Response
+from pathlib import Path
+from flask import Flask, request, Response, g
 from flask_cors import CORS
-from functools import wraps
 from config import config
+from backend.content_filter import ContentFilter
+from backend.error_handling import ErrorLogger
+from backend.callback_manager import CallbackManager
+from backend.school_registry import SchoolRegistry
+from backend.school_config import SchoolConfigManager
 from backend.session_manager import SessionManager
 from backend.profile_manager import ProfileManager
 from backend.project_manager import ProjectManager
 from backend.lyric_generator import LyricGenerator
 from backend.song_producer import SongProducer
 from backend.image_generator import ImageGenerator
-from backend.content_filter import ContentFilter
-from backend.error_handling import ErrorLogger
-from backend.callback_manager import CallbackManager
 from backend.photo_transformer import PhotoTransformer
-from frontend.routes import bp, init_routes
+from frontend.routes import bp
+from frontend.admin_routes import admin_bp
 
 # Create Flask application
 app = Flask(__name__)
@@ -28,23 +32,29 @@ app.config['SESSION_TYPE'] = 'filesystem'
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max upload
 app.config['TEMPLATES_AUTO_RELOAD'] = True  # Force template reload
 
-# HTTP Basic Authentication
-# Configure users via AUTH_USERS env var: "user1:pass1,user2:pass2"
-ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
+# --- Multi-tenant registry and config ---
+school_registry = SchoolRegistry(registry_path="data/schools.json")
+school_registry.initialize_from_env()
 
-def _load_auth_users():
-    """Parse AUTH_USERS env var into a dict."""
-    users = {}
-    for pair in os.getenv('AUTH_USERS', 'demo:demo123').split(','):
-        if ':' in pair:
-            u, p = pair.split(':', 1)
-            users[u.strip()] = p.strip()
-    return users
+school_config_manager = SchoolConfigManager(base_path="data/schools")
 
-def check_auth(username, password):
-    """Check if username/password combination is valid."""
-    valid_users = _load_auth_users()
-    return valid_users.get(username) == password
+# --- Global singletons (not tenant-scoped) ---
+content_filter = ContentFilter()
+callback_manager = CallbackManager(storage_path="data/callbacks")
+error_logger = ErrorLogger()
+
+# Callback URL from config (used by SongProducer per-request)
+callback_url = config.callback_url if hasattr(config, 'callback_url') else None
+
+# Base storage path for tenant-scoped session data
+base_storage_path = config.session.storage_path
+
+# Store global singletons and registry on app.config for route access
+app.config['CALLBACK_MANAGER'] = callback_manager
+app.config['SCHOOL_REGISTRY'] = school_registry
+app.config['SCHOOL_CONFIG_MANAGER'] = school_config_manager
+app.config['ADMIN_USERNAME'] = school_registry.get_admin_username()
+
 
 def authenticate():
     """Send 401 response that enables basic auth."""
@@ -54,111 +64,118 @@ def authenticate():
         {'WWW-Authenticate': 'Basic realm="AI Song Workshop"'}
     )
 
-def requires_auth(f):
-    """Decorator to require HTTP Basic Authentication."""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth = request.authorization
-        if not auth or not check_auth(auth.username, auth.password):
-            return authenticate()
-        return f(*args, **kwargs)
-    return decorated
 
-# Apply authentication to all routes
 @app.before_request
 def require_authentication():
     """Require authentication for all requests except callback endpoint."""
     # Allow Suno callback endpoint without authentication
     if request.path == '/api/suno/callback':
         return None
-    
+
+    # Allow static files without extra processing
+    if request.path.startswith('/static/'):
+        return None
+
     auth = request.authorization
-    if not auth or not check_auth(auth.username, auth.password):
+    if not auth or not school_registry.validate_credentials(auth.username, auth.password):
         return authenticate()
 
-# Initialize backend components
-print("Initializing AI Song Workshop Website...")
+    # Set tenant context on flask.g
+    g.https_username = auth.username
+    g.school_config = school_config_manager.get_config(auth.username)
 
-# Session management
-session_manager = SessionManager(
-    storage_path=config.session.storage_path,
-    timeout_hours=config.session.timeout_hours
-)
+    # Set up per-request tenant-scoped components
+    setup_tenant_context()
 
-# Content filter
-content_filter = ContentFilter()
 
-# Profile and project managers
-profile_manager = ProfileManager(session_manager)
-project_manager = ProjectManager(session_manager)
+def setup_tenant_context():
+    """Create per-request tenant-scoped components and store on flask.g."""
+    username = g.https_username
+    school_cfg = g.school_config
 
-# API integrations
-lyric_generator = LyricGenerator(
-    api_key=config.api.anthropic_api_key,
-    content_filter=content_filter
-)
+    # Tenant-scoped session manager
+    tenant_storage = f"{base_storage_path}/{username}"
+    session_manager = SessionManager(
+        storage_path=tenant_storage,
+        timeout_hours=config.session.timeout_hours
+    )
+    g.session_manager = session_manager
 
-# Callback manager for Suno API
-callback_manager = CallbackManager(storage_path="data/callbacks")
+    # Profile and project managers (scoped to tenant session)
+    g.profile_manager = ProfileManager(session_manager)
+    g.project_manager = ProjectManager(session_manager)
 
-# Determine callback URL (use EC2 public DNS if available)
-callback_url = config.callback_url if hasattr(config, 'callback_url') else None
-if callback_url:
-    print(f"Using callback URL: {callback_url}")
-else:
-    print("No callback URL configured, will use polling only")
+    # Lyric generator: uses school's Anthropic key (or None if no key)
+    if school_cfg.anthropic_api_key:
+        g.lyric_generator = LyricGenerator(
+            api_key=school_cfg.anthropic_api_key,
+            content_filter=content_filter
+        )
+    else:
+        g.lyric_generator = None
 
-song_producer = SongProducer(
-    api_key=config.api.suno_api_key,
-    storage_path="static/audio",
-    callback_url=callback_url,
-    callback_manager=callback_manager
-)
+    # Song producer: uses school's Suno key and tenant-scoped audio path
+    if school_cfg.suno_api_key:
+        g.song_producer = SongProducer(
+            api_key=school_cfg.suno_api_key,
+            storage_path=f"static/audio/{username}",
+            callback_url=callback_url,
+            callback_manager=callback_manager
+        )
+    else:
+        g.song_producer = None
 
-image_generator = ImageGenerator(
-    api_key=config.api.google_api_key,
-    content_filter=content_filter,
-    storage_path="static/images"
-)
+    # Image generator: uses school's Google key and tenant-scoped image path
+    if school_cfg.google_api_key:
+        g.image_generator = ImageGenerator(
+            api_key=school_cfg.google_api_key,
+            content_filter=content_filter,
+            storage_path=f"static/images/{username}"
+        )
+    else:
+        g.image_generator = None
 
-# Photo transformer (isolated photo feature)
-photo_transformer = PhotoTransformer(
-    image_generator=image_generator,
-    content_filter=content_filter,
-    session_manager=session_manager
-)
+    # Photo transformer: uses school's Google key and tenant-scoped photo path
+    if school_cfg.google_api_key and g.image_generator:
+        g.photo_transformer = PhotoTransformer(
+            image_generator=g.image_generator,
+            content_filter=content_filter,
+            session_manager=session_manager
+        )
+        # Override the default storage path to be tenant-scoped
+        g.photo_transformer.storage_path = Path(f"static/photos/{username}")
+        g.photo_transformer.storage_path.mkdir(parents=True, exist_ok=True)
+    else:
+        g.photo_transformer = None
 
-# Error logging
-error_logger = ErrorLogger()
 
-# Initialize routes with components
-init_routes(
-    profile_manager,
-    project_manager,
-    lyric_generator,
-    song_producer,
-    image_generator,
-    callback_manager,
-    photo_transformer
-)
+# --- Routes registered (components now come from flask.g, set up in setup_tenant_context) ---
+print("Initializing AI Song Workshop Website (multi-tenant)...")
 
 # Register blueprints
 app.register_blueprint(bp)
+app.register_blueprint(admin_bp)
 
-# Make config available to templates
+
+# Make school config available to templates
 @app.context_processor
 def inject_config():
-    return {'config': config, 'admin_username': ADMIN_USERNAME}
+    school_cfg = getattr(g, 'school_config', None)
+    return {
+        'config': config,
+        'school_config': school_cfg,
+        'admin_username': school_registry.get_admin_username(),
+        'https_username': getattr(g, 'https_username', None),
+    }
 
 
 if __name__ == '__main__':
-    print(f"Starting AI Song Workshop Website...")
-    print(f"Class: {config.api.header.class_name}")
-    print(f"Logo: {config.api.header.logo_path}")
-    print(f"Session storage: {config.session.storage_path}")
-    print(f"Image generation: {'Enabled' if image_generator.enabled else 'Disabled'}")
+    print(f"Starting AI Song Workshop Website (multi-tenant)...")
+    print(f"Session storage: {base_storage_path}")
+    print(f"Callback URL: {callback_url or 'Not configured (polling only)'}")
+    print(f"Schools registered: {len(school_registry.list_schools())}")
     print(f"\nServer running at http://{config.host}:{config.port}")
-    
+
     app.run(
         host=config.host,
         port=config.port,

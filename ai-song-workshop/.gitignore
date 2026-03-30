@@ -37,6 +37,11 @@ static/photos/
 *.log
 logs/
 
+# Test artifacts and one-off test scripts
+suno_test_results.txt
+test_suno_api.py
+test_apis.py
+
 # OS
 .DS_Store
 Thumbs.db

@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard — AI Liedjes Workshop{% endblock %}
+
+{% block extra_css %}
+<style>
+.admin-container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+.admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+.admin-header h2 { margin: 0; color: #333; }
+.admin-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn { display: inline-block; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.95rem; border: none; cursor: pointer; transition: background 0.15s; }
+.btn-primary { background: #667eea; color: #fff; }
+.btn-primary:hover { background: #5a6fd6; }
+.btn-secondary { background: #e2e8f0; color: #333; }
+.btn-secondary:hover { background: #cbd5e1; }
+.btn-danger { background: #e53e3e; color: #fff; }
+.btn-danger:hover { background: #c53030; }
+.btn-sm { padding: 6px 14px; font-size: 0.85rem; }
+
+.error-msg { background: #fed7d7; color: #c53030; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
+.success-msg { background: #c6f6d5; color: #276749; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
+
+.school-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.school-table th, .school-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #eee; }
+.school-table th { background: #f7fafc; color: #555; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; }
+.school-table tr:last-child td { border-bottom: none; }
+.school-table tr:hover td { background: #f0f3ff; }
+
+.key-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+.key-set { background: #c6f6d5; color: #276749; }
+.key-notset { background: #fed7d7; color: #c53030; }
+
+.credits-cell { min-width: 80px; }
+.credits-loading { color: #999; font-style: italic; font-size: 0.85rem; }
+.credits-value { font-weight: 600; color: #2d3748; }
+.credits-error { color: #c53030; font-size: 0.85rem; }
+
+.billing-links { margin-top: 20px; padding: 16px; background: #f7fafc; border-radius: 8px; }
+.billing-links h3 { margin: 0 0 10px; font-size: 1rem; color: #555; }
+.billing-links a { color: #667eea; text-decoration: none; margin-right: 20px; font-weight: 600; }
+.billing-links a:hover { text-decoration: underline; }
+
+@media (max-width: 768px) {
+    .school-table { font-size: 0.85rem; }
+    .school-table th, .school-table td { padding: 8px 10px; }
+    .admin-actions { width: 100%; }
+    .admin-actions .btn { flex: 1; text-align: center; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="admin-header">
+        <h2>⚙️ Admin Dashboard</h2>
+        <div class="admin-actions">
+            <a href="{{ url_for('admin.add_school_form') }}" class="btn btn-primary">+ Add School</a>
+            <a href="{{ url_for('admin.settings_form') }}" class="btn btn-secondary">Global Settings</a>
+        </div>
+    </div>
+
+    {% if error %}
+    <div class="error-msg">{{ error }}</div>
+    {% endif %}
+
+    <table class="school-table">
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>Class Name</th>
+                <th>Created</th>
+                <th>API Keys</th>
+                <th>Suno Credits</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for school in schools %}
+            <tr>
+                <td><strong>{{ school.username }}</strong></td>
+                <td>{{ school.class_name }}</td>
+                <td>{{ school.created_at[:10] if school.created_at else '—' }}</td>
+                <td>
+                    <span class="key-badge {{ 'key-set' if school.key_status.anthropic == 'Set' else 'key-notset' }}">A: {{ school.key_status.anthropic }}</span>
+                    <span class="key-badge {{ 'key-set' if school.key_status.suno == 'Set' else 'key-notset' }}">S: {{ school.key_status.suno }}</span>
+                    <span class="key-badge {{ 'key-set' if school.key_status.google == 'Set' else 'key-notset' }}">G: {{ school.key_status.google }}</span>
+                </td>
+                <td class="credits-cell">
+                    {% if school.key_status.suno == 'Set' %}
+                    <span class="credits-loading" id="credits-{{ school.username }}">Loading...</span>
+                    {% else %}
+                    <span style="color:#999;">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{{ url_for('admin.edit_school_form', username=school.username) }}" class="btn btn-secondary btn-sm">Edit</a>
+                    <a href="{{ url_for('admin.download_school_data', username=school.username) }}" class="btn btn-secondary btn-sm">Download</a>
+                    {% if school.username != admin_username %}
+                    <form method="post" action="{{ url_for('admin.delete_school', username=school.username) }}" style="display:inline;">
+                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Delete school {{ school.username }}? School data will become inaccessible.');">Delete</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="billing-links">
+        <h3>External Billing Pages</h3>
+        <a href="https://console.anthropic.com/settings/billing" target="_blank" rel="noopener">Anthropic Billing ↗</a>
+        <a href="https://console.cloud.google.com/billing" target="_blank" rel="noopener">Google Cloud Billing ↗</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    var schools = {{ schools | tojson }};
+    schools.forEach(function(school) {
+        if (school.key_status.suno !== 'Set') return;
+        var el = document.getElementById('credits-' + school.username);
+        if (!el) return;
+        fetchCredits(school.username, el);
+    });
+
+    function fetchCredits(username, el) {
+        el.textContent = 'Loading...';
+        el.className = 'credits-loading';
+        fetch('/admin/api/suno-credits/' + encodeURIComponent(username))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    el.textContent = data.error;
+                    el.className = 'credits-error';
+                } else {
+                    el.textContent = data.credits;
+                    el.className = 'credits-value';
+                }
+            })
+            .catch(function() {
+                el.textContent = 'Unable to check';
+                el.className = 'credits-error';
+            });
+    }
+
+    // Expose for refresh button usage
+    window.refreshCredits = function(username) {
+        var el = document.getElementById('credits-' + username);
+        if (el) fetchCredits(username, el);
+    };
+})();
+</script>
+{% endblock %}

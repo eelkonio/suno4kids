@@ -6,8 +6,8 @@
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
         <h2 style="color: #667eea;">Hallo, {{ profile.name }}! 👋</h2>
-        {% if projects|length >= 5 %}
-        <button class="btn btn-primary" disabled style="opacity: 0.5; cursor: not-allowed;" title="Maximum van 5 projecten bereikt">
+        {% if projects|length >= max_projects %}
+        <button class="btn btn-primary" disabled style="opacity: 0.5; cursor: not-allowed;" title="Maximum van {{ max_projects }} projecten bereikt">
             + Nieuw Project (Max bereikt)
         </button>
         {% else %}
@@ -23,9 +23,9 @@
     </div>
     {% endif %}
     
-    {% if projects|length >= 5 %}
+    {% if projects|length >= max_projects %}
     <div class="info-message">
-        ℹ️ Je hebt het maximum van 5 projecten bereikt. Je kunt geen nieuwe projecten meer aanmaken.
+        ℹ️ Je hebt het maximum van {{ max_projects }} projecten bereikt. Je kunt geen nieuwe projecten meer aanmaken.
     </div>
     {% endif %}
     
